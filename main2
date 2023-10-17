@@ -1,0 +1,129 @@
+#include <stdio.h>
+#include "Utilities.h"
+#include "Instructions.h"
+#include "MemoryTables.h"
+#include "Decoder.h"
+
+int main(int argc, char** argv)
+{
+	ProgramTables oProgramTables;
+	MacroTable oMacrolist;
+	String sFileName = "";
+	int i;
+	FILE* pFileAssembly = NULL;
+	FILE* pFileMacro= NULL;
+	char buffLine[MAX_ROW_LENGTH] = "";
+
+	/* check contain any file */
+	if(argc == 1)
+	{
+		fprintf(stderr, "Please add at least one file as argument.\n");
+		return 0;
+	}
+
+	/*--add macro to tables--*/
+	for(i=1; i<argc; i++)
+	{
+		bool bStatus = true;
+		sprintf(sFileName, "%s.as", argv[i]);
+		pFileMacro = fopen(sFileName, "r");
+
+		if(pFileAssembly == NULL)
+		{
+			fprintf(stderr, "Failed: The file %s does not exists.\n", sFileName);
+			continue;
+		}
+
+		fprintf(stdout, "Open file %s and start creating output files..\n", sFileName);		
+		
+		InitMacroTable(&oMacrolist);
+
+		bStatus &= addMacroToTable(pFileMacro, &oMacrolist);
+
+		/* put cursor at start of file */
+		fseek(pFileAssembly, 0 , SEEK_SET);
+
+	}
+	/*switch all macro in file*/
+	for(i=1; i<argc; i++)
+	{
+		sprintf(sFileName, "%s.as", argv[i]);/*--???--*/
+		pFileMacro = fopen(sFileName, "r");
+
+		if(pFileAssembly == NULL)
+		{
+			fprintf(stderr, "Failed: The file %s does not exists.\n", sFileName);
+			continue;
+		}
+
+		fprintf(stdout, "Open file %s and start creating output files..\n", sFileName);
+		while(fgets(buffLine, MAX_ROW_LENGTH, pFileMacro))
+		{
+			bStatus &= SwitchMacro(buffLine, &oProgramTables);
+		}
+
+		/* put cursor at start of file */
+		fseek(pFileAssembly, 0 , SEEK_SET);
+
+	}
+
+
+
+	
+	for(i=1; i<argc; i++)
+	{
+		int k;
+		bool bStatus = true;
+		sprintf(sFileName, "%s.as", argv[i]);/*--CHANGE TO .am*/
+		pFileAssembly = fopen(sFileName, "r");
+
+		if(pFileAssembly == NULL)
+		{
+			fprintf(stderr, "Failed: The file %s does not exists.\n", sFileName);
+			continue;
+		}
+
+		fprintf(stdout, "Open file %s and start creating output files..\n", sFileName);
+		
+		InitProgramTables(&oProgramTables);
+
+		for(k=0; k<=1; k++)
+		{
+			while (fgets(buffLine, MAX_ROW_LENGTH, pFileAssembly))
+			{
+				bStatus &= Decode(buffLine, &oProgramTables, k==0);
+			}
+
+			if(k == 0)
+			{
+				SetCurrentSizeAsInstrutionSize(&oProgramTables);
+			}
+
+			/* put cursor at start of file */
+			fseek(pFileAssembly, 0 , SEEK_SET);
+		}
+
+		 if(bStatus)
+		{
+			bStatus &= SetAddressToLabels(&oProgramTables);
+		}
+
+		if(bStatus)
+		{
+			fprintf(stdout, "Assembly file %s.as successfuly parsed and decoded.\n", argv[i]);
+		}
+		else
+		{
+			fprintf(stdout, "Assembly file %s.as failed on parsing/decoding.\n", argv[i]);
+		}
+
+		if(bStatus)
+		{
+			PrintMemoryTable(&oProgramTables, argv[i]);
+		}
+		
+		DeleteProgramTables(&oProgramTables);
+	}
+
+	return 0;
+}
